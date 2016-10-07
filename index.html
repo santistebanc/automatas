@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <script>
+        SVGElement.prototype.getTransformToElement = SVGElement.prototype.getTransformToElement || function(elem) {
+        return elem.getScreenCTM().inverse().multiply(this.getScreenCTM());
+    };
+    </script>
+    <script src="jquery-2.2.4.js"></script>
+    <script src='mermaid.js'></script>
+    <link rel="stylesheet" type="text/css" href="semanticui/semantic.css">
+    <style>
+    path{
+      stroke: black;
+    }
+    </style>
+</head>
+<body>
+  <div style="padding:20px;">
+    <div class="ui stackable grid">
+      <div class="row">
+        <h3 class="ui dividing header">Autómatas Finitos</h3>
+      </div>
+      <div class="row">
+        <div class="five wide column">
+
+          <div class="mini ui buttons">
+            <button id="afd" class="mini ui button ui button">AFD</button>
+            <button id="afn" class="mini ui button ui teal button">AFN</button>
+          </div>
+        </br>
+        </br>
+          <div class="ui two column grid">
+            <div class="row">
+              <div class="ten wide column">
+                <h4 class="ui header">Estados</h4>
+              </div>
+              <div class="six wide column">
+                <div class="ui action mini input" style="float: right">
+                  <input id="addStateInput" type="text" value="D" style="width: 50px;">
+                  <button id="addStateBut" class="mini ui icon button">
+                    <i class="add icon"></i>
+                  </button>
+                </div>
+              </div>
+              <div id="states" class="sixteen wide column">
+              </div>
+            </div>
+          </div>
+
+          <div class="ui two column grid">
+            <div class="row">
+              <div class="ten wide column">
+                <h4 class="ui header">Alfabeto</h4>
+              </div>
+              <div class="six wide column">
+                <div class="ui action mini input" style="float: right">
+                  <input id="addLetterInput" type="text" value="2" style="width: 50px;">
+                  <button id="addLetterBut" class="mini ui icon button">
+                    <i class="add icon"></i>
+                  </button>
+                </div>
+              </div>
+              <div id="alphabet" class="sixteen wide column">
+              </div>
+            </div>
+          </div>
+
+          <div class="ui two column grid">
+            <div class="row">
+              <div class="sixteen wide column">
+                <h4 class="ui header">Estado Inicial</h4>
+              </div>
+              <div id="initialstates" class="sixteen wide column">
+              </div>
+            </div>
+          </div>
+
+          <div class="ui two column grid">
+            <div class="row">
+              <div class="sixteen wide column">
+                <h4 class="ui header">Estados Finales</h4>
+              </div>
+              <div id="finalstates" class="sixteen wide column">
+              </div>
+            </div>
+          </div>
+
+          <div class="ui two column grid">
+            <div class="row">
+              <div class="sixteen wide column">
+                <h4 class="ui header">Funciones</h4>
+              </div>
+              <div class="sixteen wide column">
+                <div class="ui mini right labeled action input" style="height:30px; margin-top: 5px;">
+                  <!-- <div class="ui right labeled input"> -->
+                  <div class="ui label"><strong style="font-weight:bolder;font-size: 14px;">𝛿</strong></div>
+                  <select id="selectFuncState" class="ui compact selection dropdown" style="height:30px; padding: 0;">
+                  </select>
+                  <select id="selectFuncLetter" class="ui compact selection dropdown" style="height:30px; padding: 0;">
+                  </select>
+                  <div class="ui label" style="padding-left: 3px;padding-right: 3px;"><strong style="font-weight:bolder;"><i class="long arrow right icon"></i></strong></div>
+                  <select id="selectFuncNext" class="ui compact selection dropdown" style="height:30px; padding: 0;">
+                  </select>
+                  <button id="addFuncBut" class="mini ui icon button">
+                    <i class="add icon"></i>
+                  </button>
+                </div>
+              </div>
+              <div id="statefunctions" class="sixteen wide column">
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="eight wide column">
+          <div class="ui stackable one column grid">
+            <div class="row">
+              <div class="sixteen wide column">
+                <div class="ui card" id="graphDiv" style="height: 100%;width: 100%;max-height: 500px;min-height: 450px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="three wide column">
+          <div class="ui stackable one column grid">
+            <div class="row">
+              <div class="sixteen wide column">
+                <h4 class="ui header">Quíntupla</h4>
+                <pre id="tuple"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  var count = 0;
+  var graph =  ['graph TB;'];
+  var states = [];
+  var alphabet = [];
+  var initialState = undefined;
+  var finalStates = [];
+  var stateFunctions = [];
+  var mode = 1;
+    mermaidAPI.initialize({
+        startOnLoad:false,
+        flowchart:{
+           useMaxWidth: false
+        }
+    });
+    var element = document.querySelector("#graphDiv");
+    var insertSvg = function(svgCode, bindFunctions){
+        element.innerHTML = svgCode;
+    };
+    $('#afd').click(()=>{
+      if(mode == 0){
+        mode = 1;
+        $('#afd').removeClass('teal');
+        $('#afn').addClass('teal');
+      }else if(mode == 1){
+        mode = 0;
+        $('#afn').removeClass('teal');
+        $('#afd').addClass('teal');
+      }
+    })
+    $('#afn').click(()=>{
+      if(mode == 0){
+        mode = 1;
+        $('#afn').removeClass('teal');
+        $('#afd').addClass('teal');
+      }else if(mode == 1){
+        mode = 0;
+        $('#afd').removeClass('teal');
+        $('#afn').addClass('teal');
+      }
+    })
+    $('#addStateBut').click(()=>{
+      let val = $('#addStateInput').val();
+      if(!!val && states.findIndex(el=>el.title==val) == -1){
+          addState(val);
+         $('#addStateInput').val(getNextKey(val));
+      }
+    })
+    $('#addLetterBut').click(()=>{
+      let val = $('#addLetterInput').val();
+      if(!!val && alphabet.findIndex(el=>el.title==val) == -1){
+        addLetter(val);
+         $('#addLetterInput').val(++val);
+      }
+    })
+    $('#addFuncBut').click(()=>{
+      let s = $('#selectFuncState').val();
+      let l = $('#selectFuncLetter').val();
+      let e = $('#selectFuncNext').val();
+      if(!!s && !!l && !!e && stateFunctions.findIndex(el=>el.start==s && el.letter==l && el.end==e) == -1){
+        if(mode == 1){
+          addFunc(s,l,e);
+        }else if(mode == 0 && stateFunctions.findIndex(el=>el.start==s && el.letter==l) == -1){
+          addFunc(s,l,e);
+        }
+      }
+    })
+    function selectInitialState(id){
+      initialState = id;
+      changeInitialState();
+      renderGraph();
+      writeTuple();
+    }
+    function selectFinalState(id){
+      let theindex = finalStates.indexOf(id);
+      if(theindex !== -1){
+        if(finalStates.length>1){
+          finalStates.splice(theindex,1);
+        }
+      }else{
+        finalStates.push(id);
+      }
+      changeFinalStates();
+      renderGraph();
+      writeTuple();
+    }
+    function changeInitialState(){
+      let place = states.findIndex(el=>el.id==initialState);
+      $('#initialstates').children().removeClass('teal');
+      $('#initialstates').children().eq(place).addClass('teal');
+    }
+    function changeFinalStates(){
+      $('#finalstates').children().removeClass('teal');
+      finalStates.forEach(s=>{
+        let place = states.findIndex(el=>el.id==s);
+          $('#finalstates').children().eq(place).addClass('teal');
+      });
+    }
+    function addFunc(start,letter,end){
+      count ++;
+      let s = states.find(el=>el.id == start).title;
+      let l = alphabet.find(el=>el.id == letter).title;
+      let e = states.find(el=>el.id == end).title;
+      stateFunctions.push({id:count, start:start, letter:letter, end:end});
+      $('#statefunctions').append(`<a class="ui label margined" onclick="removeFunc(${count})">𝛿(${s},${l}) = {${e}}</a>`);
+      graph.push(`Nn${start}--${l}-->Nn${end} %%${count};`);
+      renderGraph();
+      writeTuple();
+    }
+    function removeFunc(id){
+      let ind = stateFunctions.findIndex(el=>el.id==id);
+      stateFunctions.splice(ind,1);
+      $('#statefunctions').children().eq(ind).remove();
+      let gind = graph.findIndex(el=>el.indexOf('%%'+id) !== -1);
+      graph.splice(gind,1);
+      renderGraph();
+      writeTuple();
+    }
+    function addState(name){
+      count ++;
+      states.push({id:count, title:name, status:'idle'});
+      $('#states').append(`<a class="ui circular label margined" onclick="removeState(${count})">${name}</a>`);
+      $('#initialstates').append(`<a class="ui circular label margined" onclick="selectInitialState(${count})">${name}</a>`);
+      $('#finalstates').append(`<a class="ui circular label margined" onclick="selectFinalState(${count})">${name}</a>`);
+      $('#selectFuncState').append(`<option value="${count}">${name}</option>`);
+      $('#selectFuncNext').append(`<option value="${count}">${name}</option>`);
+      if(!initialState){
+        initialState = count;
+        changeInitialState();
+      }
+      if(finalStates.length == 0){
+        finalStates.push(count);
+        changeFinalStates();
+      }
+      graph.push('Nn'+count+'(('+name+'));');
+      renderGraph();
+      writeTuple();
+    }
+    function removeState(id){
+      let ind = states.findIndex(el=>el.id==id);
+      states.splice(ind,1);
+      var gind = graph.findIndex(el=>el.indexOf('Nn'+id) !== -1);
+      if(gind !== -1){
+        graph.splice(gind,1);
+      }
+      $('#states').children().eq(ind).remove();
+      $('#initialstates').children().eq(ind).remove();
+      $('#finalstates').children().eq(ind).remove();
+      $('#selectFuncState').children().eq(ind).remove();
+      $('#selectFuncNext').children().eq(ind).remove();
+      if(initialState == id){
+        initialState = ind>0?(states[ind-1].id):(states.length>0?states[0].id:undefined);
+        changeInitialState();
+      }
+      let indfin = finalStates.indexOf(id);
+      if(indfin !== -1){
+        finalStates.splice(indfin, 1);
+        if(finalStates.length == 0 && states.length>0){
+          finalStates.push(ind>0?(states[ind-1].id):(states[0].id));
+        }
+        changeFinalStates();
+      }
+      $('#statefunctions').children().each(function(index, item){
+        if(stateFunctions[index].start == id || stateFunctions[index].end == id){
+          item.remove();
+        }
+      });
+
+      let removeIds = stateFunctions.filter(f=>f.start == id || f.end == id).map(a=>a.id);
+      stateFunctions = stateFunctions.filter(f=>f.start !== id && f.end !== id);
+      graph = graph.filter(it=>removeIds.findIndex(ri=>it.indexOf('%%'+ri) !== -1) == -1);
+
+      renderGraph();
+      writeTuple();
+    }
+    function addLetter(name){
+      count ++;
+      alphabet.push({id:count, title:name});
+      $('#alphabet').append(`<a class="ui label margined" onclick="removeLetter(${count})">${name}</a>`);
+      $('#selectFuncLetter').append(`<option value="${count}">${name}</option>`);
+      renderGraph();
+      writeTuple();
+    }
+    function removeLetter(id){
+      let ind = alphabet.findIndex(el=>el.id==id);
+      alphabet.splice(ind,1);
+      $('#alphabet').children().eq(ind).remove();
+      $('#selectFuncLetter').children().eq(ind).remove();
+
+      let removeIds = stateFunctions.filter(f=>f.letter == id).map(a=>a.id);
+      stateFunctions = stateFunctions.filter(f=>f.letter !== id);
+      graph = graph.filter(it=>removeIds.findIndex(ri=>it.indexOf('%%'+ri) !== -1) == -1);
+
+      renderGraph();
+      writeTuple();
+    }
+    function writeTuple(){
+      let q = `{${states.map(a=>a.title)}}`;
+      let s = `{${alphabet.map(a=>a.title)}}`;
+      let i = `${states.find(a=>a.id==initialState)?states.find(a=>a.id==initialState).title:''}`;
+      let func = `{${stateFunctions.map(a=>`\n  𝛿(${states.find(b=>b.id==a.start).title},${alphabet.find(b=>b.id==a.letter).title})={${states.find(b=>b.id==a.end).title}}`).join('  ')}`;
+      let f = `{${finalStates.map(a=>states.find(b=>b.id==a).title)}}`;
+      let tuple = `Q = ${q}\nΣ = ${s}\nq<sub>0</sub> = ${i}\n𝛿 = ${func}${stateFunctions.length>0?'\n':''}}\nF = ${f}`;
+      $('#tuple').html(tuple);
+    }
+    function renderGraph(){
+      let join = graph.join('\n');
+      console.log(join);
+      $('#graphDiv').empty();
+      mermaidAPI.render('graphDiv', join, insertSvg);
+      let rect = $('svg>g')[0].getBoundingClientRect();
+      document.querySelector("svg").setAttribute('viewBox', 10+' '+10+' '+(rect.width+20)+' '+(rect.height+20));
+      renderStyles();
+    }
+    function renderStyles(){
+      finalStates.forEach(s=>{
+        let clone = $('#Nn'+s+'>circle').clone();
+        clone.attr('r', Number(clone.attr('r'))-3);
+        clone.insertAfter($('#Nn'+s+'>circle'));
+      });
+      $('#Nn'+initialState).append(`
+          <g class="edgePath" style="opacity: 1;"><path class="path" d="M0,-16L0,-15" marker-end="url(#arrowhead13)" style="fill:none"></path><defs><marker id="arrowhead13" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="strokeWidth" markerWidth="3" markerHeight="5" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" style="fill: #333; stroke: none;"></path></marker></defs></g>
+        `);
+      $("#graphDiv").html($("#graphDiv").html()); //necesary to refresh svg
+      }
+    var getNextKey = function(key) {
+      if (key === 'Z' || key === 'z') {
+        return String.fromCharCode(key.charCodeAt() - 25) + String.fromCharCode(key.charCodeAt() - 25); // AA or aa
+      } else {
+        var lastChar = key.slice(-1);
+        var sub = key.slice(0, -1);
+        if (lastChar === 'Z' || lastChar === 'z') {
+          // If a string of length > 1 ends in Z/z,
+          // increment the string (excluding the last Z/z) recursively,
+          // and append A/a (depending on casing) to it
+          return getNextKey(sub) + String.fromCharCode(lastChar.charCodeAt() - 25);
+        } else {
+          // (take till last char) append with (increment last char)
+          return sub + String.fromCharCode(lastChar.charCodeAt() + 1);
+        }
+      }
+      return key;
+    };
+    $(function(){
+        addState('A');
+        addState('B');
+        addState('C');
+        addLetter('0');
+        addLetter('1');
+        selectFinalState(states[2].id);
+        selectFinalState(states[0].id);
+        addFunc(states[0].id,alphabet[0].id,states[1].id);
+        addFunc(states[1].id,alphabet[1].id,states[2].id);
+        addFunc(states[2].id,alphabet[1].id,states[0].id);
+        addFunc(states[2].id,alphabet[0].id,states[1].id);
+    });
+</script>
+    <style>
+    circle{
+      stroke-width: 2px !important;
+    }
+    svg{
+      height: 100%;
+      width: 100%;
+    }
+    .label.margined{
+      margin-top: 3px !important;
+    }
+    </style>
+</body>
+</html>
