@@ -56,7 +56,7 @@
               </div>
               <div class="six wide column">
                 <div class="ui action mini input" style="float: right">
-                  <input id="addLetterInput" type="text" value="2" style="width: 50px;">
+                  <input id="addLetterInput" type="text" value="2" style="width: 50px;" maxlength="1">
                   <button id="addLetterBut" class="mini ui icon button">
                     <i class="add icon"></i>
                   </button>
@@ -118,7 +118,35 @@
           <div class="ui stackable one column grid">
             <div class="row">
               <div class="sixteen wide column">
-                <div class="ui card" id="graphDiv" style="height: 100%;width: 100%;max-height: 500px;min-height: 450px;"></div>
+                <div class="ui card" id="graphDiv" style="height: 100%;width: 100%;max-height: 400px;min-height: 350px;"></div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="four wide column">
+                <h4 class="ui header">Entrada</h4>
+
+              </div>
+              <div class="twelve wide column">
+                <div class="ui action mini input" style="float: right">
+                  <form id="testform">
+                  <input id="inputtext" type="text" style="width: 200px;">
+                  <input type="submit" class="mini ui icon button" value="Probar">
+                  </form>
+                </div>
+              </div>
+              </div>
+              <div class="row">
+              <div class="fourteen wide column">
+                <div id="inputsymbols" class="mini ui buttons">
+                </div>
+              </div>
+              <div class="two wide column">
+                <button id="playBut" class="mini ui icon button">
+                  <i class="play icon"></i>
+                </button>
+              </div>
+              <div class="sixteen wide column">
+                <h3 id="simMessage"></h3>
               </div>
             </div>
           </div>
@@ -144,6 +172,57 @@
   var initialState = undefined;
   var finalStates = [];
   var stateFunctions = [];
+
+  var simInput = ['inicio', 'fin'];
+  var simCurrent = [];
+  var simStep = 0;
+  var simError = -1;
+
+  function simulateNext(){
+    if(simStep<simInput.length-1 && simError == -1){
+      simStep ++;
+      if(simStep == 1){
+        simCurrent = [String(initialState)];
+      }else{
+      let sym = alphabet.find(el=>el.title == simInput[simStep-1]);
+      let newsimCurrent = []
+        if(sym !== undefined){
+          let found = false;
+          simCurrent.forEach(cur=>{
+            let funcs = stateFunctions.filter(s=>cur == s.start && s.letter==sym.id);
+            if(funcs.length !== 0){
+              found = true;
+              newsimCurrent.push(...funcs.map(s=>String(s.end)));
+            }
+          });
+          if(!found){
+            $('#simMessage').empty().append(`cadena rechazada: no hay transiciones para ${simInput[simStep-1]} en el estado actual`);
+            simError = simStep;
+            simStep = simInput.length-1;
+          }else{
+            simCurrent = newsimCurrent;
+          }
+        }else{
+          $('#simMessage').empty().append(`${simInput[simStep-1]} no está en el alfabeto`);
+          simError = simStep;
+          simStep = simInput.length-1;
+        }
+    }
+    if(simStep == simInput.length-1 && simError == -1){
+      console.log(finalStates, simCurrent, findOne(finalStates, simCurrent));
+      if(findOne(finalStates, simCurrent)){
+        $('#simMessage').empty().append(`cadena aceptada`);
+      }else{
+        simError = simStep+1;
+        $('#simMessage').empty().append(`cadena rechazada: la cadena finalizo en un estado no terminal`);
+      }
+    }
+
+  }
+    renderInput();
+    renderGraph();
+  }
+
   var mode = 1;
     mermaidAPI.initialize({
         startOnLoad:false,
@@ -203,6 +282,21 @@
         }
       }
     })
+    $('#playBut').click(()=>{
+      simulateNext();
+    })
+    $('#testform').submit((e)=>{
+      e.preventDefault();
+      simError = -1;
+      simInput = $('#inputtext').val().split('');
+      simInput.unshift('inicio');
+      simInput.push('fin');
+      simCurrent = [];
+      simStep = 0;
+      $('#simMessage').empty()
+      renderInput();
+      renderGraph();
+    })
     function selectInitialState(id){
       initialState = id;
       changeInitialState();
@@ -210,13 +304,13 @@
       writeTuple();
     }
     function selectFinalState(id){
-      let theindex = finalStates.indexOf(id);
+      let theindex = finalStates.indexOf(String(id));
       if(theindex !== -1){
         if(finalStates.length>1){
           finalStates.splice(theindex,1);
         }
       }else{
-        finalStates.push(id);
+        finalStates.push(String(id));
       }
       changeFinalStates();
       renderGraph();
@@ -267,7 +361,7 @@
         changeInitialState();
       }
       if(finalStates.length == 0){
-        finalStates.push(count);
+        finalStates.push(String(count));
         changeFinalStates();
       }
       graph.push('Nn'+count+'(('+name+'));');
@@ -290,11 +384,11 @@
         initialState = ind>0?(states[ind-1].id):(states.length>0?states[0].id:undefined);
         changeInitialState();
       }
-      let indfin = finalStates.indexOf(id);
+      let indfin = finalStates.indexOf(String(id));
       if(indfin !== -1){
         finalStates.splice(indfin, 1);
         if(finalStates.length == 0 && states.length>0){
-          finalStates.push(ind>0?(states[ind-1].id):(states[0].id));
+          finalStates.push(ind>0?String(states[ind-1].id):String(states[0].id));
         }
         changeFinalStates();
       }
@@ -337,9 +431,17 @@
       let s = `{${alphabet.map(a=>a.title)}}`;
       let i = `${states.find(a=>a.id==initialState)?states.find(a=>a.id==initialState).title:''}`;
       let func = `{${stateFunctions.map(a=>`\n  𝛿(${states.find(b=>b.id==a.start).title},${alphabet.find(b=>b.id==a.letter).title})={${states.find(b=>b.id==a.end).title}}`).join('  ')}`;
-      let f = `{${finalStates.map(a=>states.find(b=>b.id==a).title)}}`;
+      let f = `{${finalStates.map(a=>String(states.find(b=>b.id==a).title))}}`;
       let tuple = `Q = ${q}\nΣ = ${s}\nq<sub>0</sub> = ${i}\n𝛿 = ${func}${stateFunctions.length>0?'\n':''}}\nF = ${f}`;
       $('#tuple').html(tuple);
+    }
+    function renderInput(){
+      $('#inputsymbols').empty();
+      simInput.forEach((s,i)=>{
+        let current = simStep == simInput.length-1 && simError==-1?'green':i==simError-1?'red':i==simStep?'blue':'';
+        let sym = `<span id="simstart" class="mini ui button ui button ${current}" style="padding-left: 1px;padding-right: 1px">${s}</span>`;
+        $('#inputsymbols').append(sym);
+      });
     }
     function renderGraph(){
       let join = graph.join('\n');
@@ -355,6 +457,9 @@
         let clone = $('#Nn'+s+'>circle').clone();
         clone.attr('r', Number(clone.attr('r'))-3);
         clone.insertAfter($('#Nn'+s+'>circle'));
+      });
+      simCurrent.forEach(s=>{
+          $('#Nn'+s).css({ fill: "#aff" });
       });
       $('#Nn'+initialState).append(`
           <g class="edgePath" style="opacity: 1;"><path class="path" d="M0,-16L0,-15" marker-end="url(#arrowhead13)" style="fill:none"></path><defs><marker id="arrowhead13" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="strokeWidth" markerWidth="3" markerHeight="5" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" style="fill: #333; stroke: none;"></path></marker></defs></g>
@@ -379,6 +484,24 @@
       }
       return key;
     };
+    function union (x, y) {
+  var obj = {};
+  for (var i = x.length-1; i >= 0; -- i)
+     obj[x[i]] = x[i];
+  for (var i = y.length-1; i >= 0; -- i)
+     obj[y[i]] = y[i];
+  var res = []
+  for (var k in obj) {
+    if (obj.hasOwnProperty(k))  // <-- optional
+      res.push(obj[k]);
+  }
+  return res;
+}
+var findOne = function (haystack, arr) {
+    return arr.some(function (v) {
+        return haystack.indexOf(v) >= 0;
+    });
+};
     $(function(){
         addState('A');
         addState('B');
@@ -391,6 +514,7 @@
         addFunc(states[1].id,alphabet[1].id,states[2].id);
         addFunc(states[2].id,alphabet[1].id,states[0].id);
         addFunc(states[2].id,alphabet[0].id,states[1].id);
+        renderInput();
     });
 </script>
     <style>
