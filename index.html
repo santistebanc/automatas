@@ -28,6 +28,8 @@
           <div class="mini ui buttons">
             <button id="afd" class="mini ui button ui button">AFD</button>
             <button id="afn" class="mini ui button ui teal button">AFN</button>
+            <button id="pila" class="mini ui button ui button">Pila</button>
+            <button id="turing" class="mini ui button ui button">Turing</button>
           </div>
         </br>
         </br>
@@ -67,12 +69,40 @@
             </div>
           </div>
 
+          <div id="stackinputplace" class="ui two column grid">
+            <div class="row">
+              <div class="ten wide column">
+                <h4 class="ui header">Alfabeto de Pila</h4>
+              </div>
+              <div class="six wide column">
+                <div class="ui action mini input" style="float: right">
+                  <input id="addStackInput" type="text" value="T" style="width: 50px;" maxlength="1">
+                  <button id="addStackBut" class="mini ui icon button">
+                    <i class="add icon"></i>
+                  </button>
+                </div>
+              </div>
+              <div id="stackalphabet" class="sixteen wide column">
+              </div>
+            </div>
+          </div>
+
           <div class="ui two column grid">
             <div class="row">
               <div class="sixteen wide column">
                 <h4 class="ui header">Estado Inicial</h4>
               </div>
               <div id="initialstates" class="sixteen wide column">
+              </div>
+            </div>
+          </div>
+
+          <div id="stackinitial" class="ui two column grid">
+            <div class="row">
+              <div class="sixteen wide column">
+                <h4 class="ui header">Estado Inicial de Pila</h4>
+              </div>
+              <div id="initialstack" class="sixteen wide column">
               </div>
             </div>
           </div>
@@ -100,9 +130,12 @@
                   </select>
                   <select id="selectFuncLetter" class="ui compact selection dropdown" style="height:30px; padding: 0;">
                   </select>
+                  <select id="selectFuncStack" class="ui compact selection dropdown" style="height:30px; padding: 0;">
+                  </select>
                   <div class="ui label" style="padding-left: 3px;padding-right: 3px;"><strong style="font-weight:bolder;"><i class="long arrow right icon"></i></strong></div>
                   <select id="selectFuncNext" class="ui compact selection dropdown" style="height:30px; padding: 0;">
                   </select>
+                  <input id="selectFuncStackNext" type="text" class="ui compact selection dropdown" style="height:30px; width:40px; padding: 0;"/>
                   <button id="addFuncBut" class="mini ui icon button">
                     <i class="add icon"></i>
                   </button>
@@ -137,6 +170,10 @@
               </div>
               <div class="row">
               <div class="fourteen wide column">
+                <div id="stacksymbols" class="mini ui buttons">
+                </div>
+              </div>
+              <div class="fourteen wide column">
                 <div id="inputsymbols" class="mini ui buttons">
                 </div>
               </div>
@@ -169,11 +206,14 @@
   var graph =  ['graph TB;'];
   var states = [];
   var alphabet = [];
+  var stackalphabet = [];
   var initialState = undefined;
+  var initialStack = undefined;
   var finalStates = [];
   var stateFunctions = [];
 
   var simInput = ['inicio', 'fin'];
+  var simStack = [];
   var simCurrent = [];
   var simStep = 0;
   var simError = -1;
@@ -185,22 +225,32 @@
         simCurrent = [String(initialState)];
       }else{
       let sym = alphabet.find(el=>el.title == simInput[simStep-1]);
+      let topstack = mode == 2 && simStack[0]?stackalphabet.find(el=>el.title == simStack[0]):{};
       let newsimCurrent = []
+      let newsimStack = []
         if(sym !== undefined){
           let found = false;
           simCurrent.forEach(cur=>{
-            let funcs = stateFunctions.filter(s=>cur == s.start && s.letter==sym.id);
+            let funcs = stateFunctions.filter(s=>cur == s.start && s.letter==sym.id && s.stack==topstack.id);
             if(funcs.length !== 0){
               found = true;
               newsimCurrent.push(...funcs.map(s=>String(s.end)));
+              let st = funcs[0].nextstack || [];
+              newsimStack.push(...st);
             }
           });
-          if(!found){
-            $('#simMessage').empty().append(`cadena rechazada: no hay transiciones para ${simInput[simStep-1]} en el estado actual`);
+          if(mode==2 && simStack.length == 0){
+            $('#simMessage').empty().append(`cadena rechazada: la pila se vació antes de terminar la cadena`);
+            simError = simStep;
+            simStep = simInput.length-1;
+          }else if(!found){
+            $('#simMessage').empty().append(`cadena rechazada: no hay transiciones para ${simInput[simStep-1]}${mode==2?', '+topstack.title:''} en el estado actual`);
             simError = simStep;
             simStep = simInput.length-1;
           }else{
             simCurrent = newsimCurrent;
+            simStack.shift();
+            simStack.unshift(...newsimStack.map(n=>stackalphabet.find(s=>s.id==n).title));
           }
         }else{
           $('#simMessage').empty().append(`${simInput[simStep-1]} no está en el alfabeto`);
@@ -212,6 +262,8 @@
       console.log(finalStates, simCurrent, findOne(finalStates, simCurrent));
       if(findOne(finalStates, simCurrent)){
         $('#simMessage').empty().append(`cadena aceptada`);
+      }else if(simStack.length==0 && mode==2){
+        $('#simMessage').empty().append(`cadena aceptada`);
       }else{
         simError = simStep+1;
         $('#simMessage').empty().append(`cadena rechazada: la cadena finalizo en un estado no terminal`);
@@ -222,7 +274,11 @@
     renderInput();
     renderGraph();
   }
-
+  $('#stackinputplace').hide();
+  $('#stackinitial').hide();
+  $('#selectFuncStack').hide();
+  $('#selectFuncStackNext').hide();
+  $('#stacksymbols').hide();
   var mode = 1;
     mermaidAPI.initialize({
         startOnLoad:false,
@@ -234,27 +290,41 @@
     var insertSvg = function(svgCode, bindFunctions){
         element.innerHTML = svgCode;
     };
+    function removeClasses(){
+      $('#afd').removeClass('teal');
+      $('#afn').removeClass('teal');
+      $('#pila').removeClass('teal');
+      $('#turing').removeClass('teal');
+      $('#stackinputplace').hide();
+      $('#stackinitial').hide();
+      $('#selectFuncStack').hide();
+      $('#selectFuncStackNext').hide();
+      $('#stacksymbols').hide();
+    }
     $('#afd').click(()=>{
-      if(mode == 0){
-        mode = 1;
-        $('#afd').removeClass('teal');
-        $('#afn').addClass('teal');
-      }else if(mode == 1){
-        mode = 0;
-        $('#afn').removeClass('teal');
-        $('#afd').addClass('teal');
-      }
+      removeClasses();
+      $('#afd').addClass('teal');
+      mode = 0;
     })
     $('#afn').click(()=>{
-      if(mode == 0){
-        mode = 1;
-        $('#afn').removeClass('teal');
-        $('#afd').addClass('teal');
-      }else if(mode == 1){
-        mode = 0;
-        $('#afd').removeClass('teal');
-        $('#afn').addClass('teal');
-      }
+      removeClasses();
+      $('#afn').addClass('teal');
+      mode = 1;
+    })
+    $('#pila').click(()=>{
+      removeClasses();
+      $('#pila').addClass('teal');
+      mode = 2;
+      $('#stackinputplace').show();
+      $('#stackinitial').show();
+      $('#selectFuncStack').show();
+      $('#selectFuncStackNext').show();
+      $('#stacksymbols').show();
+    })
+    $('#turing').click(()=>{
+      removeClasses();
+      $('#turing').addClass('teal');
+      mode = 3;
     })
     $('#addStateBut').click(()=>{
       let val = $('#addStateInput').val();
@@ -270,17 +340,26 @@
          $('#addLetterInput').val(++val);
       }
     })
+    $('#addStackBut').click(()=>{
+      let val = $('#addStackInput').val();
+      if(!!val && alphabet.findIndex(el=>el.title==val) == -1){
+        addStackLetter(val);
+        $('#addStackInput').val(getNextKey(val));
+      }
+    })
     $('#addFuncBut').click(()=>{
       let s = $('#selectFuncState').val();
       let l = $('#selectFuncLetter').val();
+      let t = $('#selectFuncStack').val();
       let e = $('#selectFuncNext').val();
-      if(!!s && !!l && !!e && stateFunctions.findIndex(el=>el.start==s && el.letter==l && el.end==e) == -1){
-        if(mode == 1){
+      let n = $('#selectFuncStackNext').val();
+        if(!!s && !!l && !!e && !!t && mode == 2 && stateFunctions.findIndex(el=>el.start==s && el.letter==l && el.stack==t) == -1){
+          addFuncStack(s,l,t,e,n);
+        }else if(!!s && !!l && !!e && mode == 1 && stateFunctions.findIndex(el=>el.start==s && el.letter==l && el.end == e) == -1){
           addFunc(s,l,e);
-        }else if(mode == 0 && stateFunctions.findIndex(el=>el.start==s && el.letter==l) == -1){
+        }else if(!!s && !!l && !!e && mode == 0 && stateFunctions.findIndex(el=>el.start==s && el.letter==l) == -1){
           addFunc(s,l,e);
         }
-      }
     })
     $('#playBut').click(()=>{
       simulateNext();
@@ -290,6 +369,7 @@
       simError = -1;
       simInput = $('#inputtext').val().split('');
       simInput.unshift('inicio');
+      simStack = [stackalphabet.find(el=>el.id == initialStack).title];
       simInput.push('fin');
       simCurrent = [];
       simStep = 0;
@@ -297,6 +377,12 @@
       renderInput();
       renderGraph();
     })
+    function selectInitialStack(id){
+      initialStack = id;
+      changeInitialStack();
+      renderGraph();
+      writeTuple();
+    }
     function selectInitialState(id){
       initialState = id;
       changeInitialState();
@@ -306,9 +392,7 @@
     function selectFinalState(id){
       let theindex = finalStates.indexOf(String(id));
       if(theindex !== -1){
-        if(finalStates.length>1){
           finalStates.splice(theindex,1);
-        }
       }else{
         finalStates.push(String(id));
       }
@@ -320,6 +404,11 @@
       let place = states.findIndex(el=>el.id==initialState);
       $('#initialstates').children().removeClass('teal');
       $('#initialstates').children().eq(place).addClass('teal');
+    }
+    function changeInitialStack(){
+      let place = stackalphabet.findIndex(el=>el.id==initialStack);
+      $('#initialstack').children().removeClass('teal');
+      $('#initialstack').children().eq(place).addClass('teal');
     }
     function changeFinalStates(){
       $('#finalstates').children().removeClass('teal');
@@ -339,7 +428,31 @@
       renderGraph();
       writeTuple();
     }
+    function addFuncStack(start,letter,stack,end,nextstack){
+      count ++;
+      let s = states.find(el=>el.id == start).title;
+      let l = alphabet.find(el=>el.id == letter).title;
+      let t = stackalphabet.find(el=>el.id == stack).title;
+      let e = states.find(el=>el.id == end).title;
+      let pren = nextstack.split('').map(ns=>stackalphabet.find(el=>el.title == ns));
+      let n = pren.map(p=>p.title);
+      let nid = pren.map(p=>p.id);
+      stateFunctions.push({id:count, start:start, letter:letter, stack: stack, end:end, nextstack: nid});
+      $('#statefunctions').append(`<a class="ui label margined" onclick="removeFuncStack(${count})">𝛿(${s},${l},${t}) = {${e},${n.join('')}}</a>`);
+      graph.push(`Nn${start}--${l}, ${t}-->Nn${end} %%${count};`);
+      renderGraph();
+      writeTuple();
+    }
     function removeFunc(id){
+      let ind = stateFunctions.findIndex(el=>el.id==id);
+      stateFunctions.splice(ind,1);
+      $('#statefunctions').children().eq(ind).remove();
+      let gind = graph.findIndex(el=>el.indexOf('%%'+id) !== -1);
+      graph.splice(gind,1);
+      renderGraph();
+      writeTuple();
+    }
+    function removeFuncStack(id){
       let ind = stateFunctions.findIndex(el=>el.id==id);
       stateFunctions.splice(ind,1);
       $('#statefunctions').children().eq(ind).remove();
@@ -413,6 +526,20 @@
       renderGraph();
       writeTuple();
     }
+    function addStackLetter(name){
+      count ++;
+      stackalphabet.push({id:count, title:name});
+      $('#stackalphabet').append(`<a class="ui label margined" onclick="removeStackLetter(${count})">${name}</a>`);
+      $('#initialstack').append(`<a class="ui circular label margined" onclick="selectInitialStack(${count})">${name}</a>`);
+      $('#selectFuncStack').append(`<option value="${count}">${name}</option>`);
+      if(!initialStack){
+        initialStack = count;
+        changeInitialStack();
+      }
+      //$('#selectFuncLetter').append(`<option value="${count}">${name}</option>`);
+      renderGraph();
+      writeTuple();
+    }
     function removeLetter(id){
       let ind = alphabet.findIndex(el=>el.id==id);
       alphabet.splice(ind,1);
@@ -423,6 +550,24 @@
       stateFunctions = stateFunctions.filter(f=>f.letter !== id);
       graph = graph.filter(it=>removeIds.findIndex(ri=>it.indexOf('%%'+ri) !== -1) == -1);
 
+      renderGraph();
+      writeTuple();
+    }
+    function removeStackLetter(id){
+      let ind = stackalphabet.findIndex(el=>el.id==id);
+      stackalphabet.splice(ind,1);
+      $('#stackalphabet').children().eq(ind).remove();
+      $('#initialstack').children().eq(ind).remove();
+      $('#selectFuncStack').children().eq(ind).remove();
+      if(initialStack == id){
+        initialStack = ind>0?(stackalphabet[ind-1].id):(stackalphabet.length>0?stackalphabet[0].id:undefined);
+        changeInitialStack();
+      }
+
+      // let removeIds = stateFunctions.filter(f=>f.letter == id).map(a=>a.id);
+      // stateFunctions = stateFunctions.filter(f=>f.letter !== id);
+      // graph = graph.filter(it=>removeIds.findIndex(ri=>it.indexOf('%%'+ri) !== -1) == -1);
+      //
       renderGraph();
       writeTuple();
     }
@@ -437,10 +582,15 @@
     }
     function renderInput(){
       $('#inputsymbols').empty();
+      $('#stacksymbols').empty();
       simInput.forEach((s,i)=>{
         let current = simStep == simInput.length-1 && simError==-1?'green':i==simError-1?'red':i==simStep?'blue':'';
         let sym = `<span id="simstart" class="mini ui button ui button ${current}" style="padding-left: 1px;padding-right: 1px">${s}</span>`;
         $('#inputsymbols').append(sym);
+      });
+      simStack.forEach((s,i)=>{
+        let sym = `<span class="mini ui button ui button" style="padding-left: 10px;padding-right: 10px">${s}</span>`;
+        $('#stacksymbols').append(sym);
       });
     }
     function renderGraph(){
@@ -508,6 +658,7 @@ var findOne = function (haystack, arr) {
         addState('C');
         addLetter('0');
         addLetter('1');
+        addStackLetter('S');
         selectFinalState(states[2].id);
         selectFinalState(states[0].id);
         addFunc(states[0].id,alphabet[0].id,states[1].id);
