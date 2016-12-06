@@ -26,8 +26,8 @@
         <div class="five wide column">
 
           <div class="mini ui buttons">
-            <button id="afd" class="mini ui button ui button">AFD</button>
-            <button id="afn" class="mini ui button ui teal button">AFN</button>
+            <button id="afd" class="mini ui button ui teal button">AFD</button>
+            <button id="afn" class="mini ui button ui button">AFN</button>
             <button id="pila" class="mini ui button ui button">Pila</button>
             <button id="turing" class="mini ui button ui button">Turing</button>
           </div>
@@ -76,7 +76,7 @@
               </div>
               <div class="six wide column">
                 <div class="ui action mini input" style="float: right">
-                  <input id="addStackInput" type="text" value="T" style="width: 50px;" maxlength="1">
+                  <input id="addStackInput" type="text" value="U" style="width: 50px;" maxlength="1">
                   <button id="addStackBut" class="mini ui icon button">
                     <i class="add icon"></i>
                   </button>
@@ -134,6 +134,12 @@
                   </select>
                   <div class="ui label" style="padding-left: 3px;padding-right: 3px;"><strong style="font-weight:bolder;"><i class="long arrow right icon"></i></strong></div>
                   <select id="selectFuncNext" class="ui compact selection dropdown" style="height:30px; padding: 0;">
+                  </select>
+                  <select id="selectFuncNew" class="ui compact selection dropdown" style="height:30px; padding: 0;">
+                  </select>
+                  <select id="selectFuncDirection" class="ui compact selection dropdown" style="height:30px; padding: 0;">
+                  <option value="D">Der</option>
+                  <option value="I">Izq</option>
                   </select>
                   <input id="selectFuncStackNext" type="text" class="ui compact selection dropdown" style="height:30px; width:40px; padding: 0;"/>
                   <button id="addFuncBut" class="mini ui icon button">
@@ -217,60 +223,81 @@
   var simCurrent = [];
   var simStep = 0;
   var simError = -1;
+  var simDirection = 1;
+  var simNew;
+  var sym;
 
   function simulateNext(){
-    if(simStep<simInput.length-1 && simError == -1){
-      simStep ++;
-      if(simStep == 1){
-        simCurrent = [String(initialState)];
+
+    if(simStep==0){
+      if(mode == 3){
+        simStep += 2;
       }else{
-      let sym = alphabet.find(el=>el.title == simInput[simStep-1]);
+        simStep ++;
+      }
+      simCurrent = [String(initialState)];
+    }else if(simStep<simInput.length-1 && simError == -1){
+
+      sym = alphabet.find(el=>el.title == simInput[simStep]);
       let topstack = mode == 2 && simStack[0]?stackalphabet.find(el=>el.title == simStack[0]):{};
       let newsimCurrent = []
       let newsimStack = []
-        if(sym !== undefined){
-          let found = false;
-          simCurrent.forEach(cur=>{
-            let funcs = stateFunctions.filter(s=>cur == s.start && s.letter==sym.id && s.stack==topstack.id);
-            if(funcs.length !== 0){
-              found = true;
-              newsimCurrent.push(...funcs.map(s=>String(s.end)));
-              let st = funcs[0].nextstack || [];
-              newsimStack.push(...st);
+      if(sym !== undefined){
+        let found = false;
+        simCurrent.forEach(cur=>{
+          let funcs = stateFunctions.filter(s=>cur == s.start && s.letter==sym.id && s.stack==topstack.id);
+          if(funcs.length !== 0){
+            found = true;
+            newsimCurrent.push(...funcs.map(s=>String(s.end)));
+            let st = funcs[0].nextstack || [];
+            newsimStack.push(...st);
+            if(mode == 3){
+              let nn = alphabet.find(n=>n.id==funcs[0].newletter);
+              simInput[simStep] = nn && nn.title;
+              simDirection = funcs[0].direction == 'I'?-1:1;
             }
-          });
-          if(mode==2 && simStack.length == 0){
-            $('#simMessage').empty().append(`cadena rechazada: la pila se vació antes de terminar la cadena`);
-            simError = simStep;
-            simStep = simInput.length-1;
-          }else if(!found){
-            $('#simMessage').empty().append(`cadena rechazada: no hay transiciones para ${simInput[simStep-1]}${mode==2?', '+topstack.title:''} en el estado actual`);
-            simError = simStep;
-            simStep = simInput.length-1;
-          }else{
-            simCurrent = newsimCurrent;
-            simStack.shift();
-            simStack.unshift(...newsimStack.map(n=>stackalphabet.find(s=>s.id==n).title));
           }
-        }else{
-          $('#simMessage').empty().append(`${simInput[simStep-1]} no está en el alfabeto`);
+        });
+        if(mode==2 && simStack.length == 0){
+          $('#simMessage').empty().append(`cadena rechazada: la pila se vació antes de terminar la cadena`);
           simError = simStep;
           simStep = simInput.length-1;
+        }else if(!found){
+          $('#simMessage').empty().append(`cadena rechazada: no hay transiciones para ${simInput[simStep]}${mode==2?', '+topstack.title:''} en el estado actual`);
+          simError = simStep;
+          simStep = simInput.length-1;
+        }else{
+          if(mode == 3 && simStep == simInput.length-2){
+            simInput.splice(simInput.length-1,0,'b');
+          }else if(mode == 3 && simStep == 1){
+            simInput.splice(1,0,'b');
+            simStep ++;
+          }
+          simStep += simDirection;
+          simCurrent = newsimCurrent;
+          simStack.shift();
+          simStack.unshift(...newsimStack.map(n=>stackalphabet.find(s=>s.id==n).title));
+          if(mode == 3 && findOne(finalStates, simCurrent)){
+            simStep = simInput.length-1;
+          }
         }
-    }
+      }else{
+        $('#simMessage').empty().append(`${simInput[simStep]} no está en el alfabeto`);
+        simError = simStep;
+        simStep = simInput.length-1;
+      }
     if(simStep == simInput.length-1 && simError == -1){
-      console.log(finalStates, simCurrent, findOne(finalStates, simCurrent));
       if(findOne(finalStates, simCurrent)){
         $('#simMessage').empty().append(`cadena aceptada`);
       }else if(simStack.length==0 && mode==2){
         $('#simMessage').empty().append(`cadena aceptada`);
       }else{
-        simError = simStep+1;
+        simError = simStep;
         $('#simMessage').empty().append(`cadena rechazada: la cadena finalizo en un estado no terminal`);
       }
     }
-
   }
+
     renderInput();
     renderGraph();
   }
@@ -279,7 +306,9 @@
   $('#selectFuncStack').hide();
   $('#selectFuncStackNext').hide();
   $('#stacksymbols').hide();
-  var mode = 1;
+  $('#selectFuncNew').hide();
+  $('#selectFuncDirection').hide();
+  var mode = 0;
     mermaidAPI.initialize({
         startOnLoad:false,
         flowchart:{
@@ -300,16 +329,27 @@
       $('#selectFuncStack').hide();
       $('#selectFuncStackNext').hide();
       $('#stacksymbols').hide();
+      $('#selectFuncNew').hide();
+      $('#selectFuncDirection').hide();
+
+      let index = alphabet.indexOf("b");
+      if (index > -1) array.splice(index, 1);
+      $('#selectFuncLetter>.boption').remove();
+      $('#selectFuncNew>.boption').remove();
     }
     $('#afd').click(()=>{
       removeClasses();
       $('#afd').addClass('teal');
       mode = 0;
+      removeAllFunc();
+      resetSim()
     })
     $('#afn').click(()=>{
       removeClasses();
       $('#afn').addClass('teal');
       mode = 1;
+      removeAllFunc();
+      resetSim()
     })
     $('#pila').click(()=>{
       removeClasses();
@@ -320,11 +360,21 @@
       $('#selectFuncStack').show();
       $('#selectFuncStackNext').show();
       $('#stacksymbols').show();
+      removeAllFunc();
+      resetSim()
     })
     $('#turing').click(()=>{
       removeClasses();
       $('#turing').addClass('teal');
       mode = 3;
+      $('#selectFuncNew').show();
+      $('#selectFuncDirection').show();
+      count ++;
+      alphabet.push({id:count, title:"b"});
+      $('#selectFuncLetter').prepend(`<option class="boption" value="${count}">${"b"}</option>`);
+      $('#selectFuncNew').prepend(`<option class="boption" value="${count}">${"b"}</option>`);
+      removeAllFunc();
+      resetSim()
     })
     $('#addStateBut').click(()=>{
       let val = $('#addStateInput').val();
@@ -332,6 +382,7 @@
           addState(val);
          $('#addStateInput').val(getNextKey(val));
       }
+      resetSim()
     })
     $('#addLetterBut').click(()=>{
       let val = $('#addLetterInput').val();
@@ -339,6 +390,7 @@
         addLetter(val);
          $('#addLetterInput').val(++val);
       }
+      resetSim()
     })
     $('#addStackBut').click(()=>{
       let val = $('#addStackInput').val();
@@ -346,6 +398,7 @@
         addStackLetter(val);
         $('#addStackInput').val(getNextKey(val));
       }
+      resetSim()
     })
     $('#addFuncBut').click(()=>{
       let s = $('#selectFuncState').val();
@@ -353,30 +406,43 @@
       let t = $('#selectFuncStack').val();
       let e = $('#selectFuncNext').val();
       let n = $('#selectFuncStackNext').val();
-        if(!!s && !!l && !!e && !!t && mode == 2 && stateFunctions.findIndex(el=>el.start==s && el.letter==l && el.stack==t) == -1){
+      let w = $('#selectFuncNew').val();
+      let d = $('#selectFuncDirection').val();
+        if(!!s && !!l && !!e && !!w && !!d && mode == 3 && stateFunctions.findIndex(el=>el.start==s && el.letter==l) == -1){
+          addFuncTuring(s,l,e,w,d);
+        }else if(!!s && !!l && !!e && !!t && mode == 2 && stateFunctions.findIndex(el=>el.start==s && el.letter==l && el.stack==t) == -1){
           addFuncStack(s,l,t,e,n);
         }else if(!!s && !!l && !!e && mode == 1 && stateFunctions.findIndex(el=>el.start==s && el.letter==l && el.end == e) == -1){
           addFunc(s,l,e);
         }else if(!!s && !!l && !!e && mode == 0 && stateFunctions.findIndex(el=>el.start==s && el.letter==l) == -1){
           addFunc(s,l,e);
         }
+        resetSim()
     })
     $('#playBut').click(()=>{
       simulateNext();
     })
     $('#testform').submit((e)=>{
       e.preventDefault();
+      resetSim();
+    })
+    function resetSim(){
       simError = -1;
       simInput = $('#inputtext').val().split('');
+      if(mode == 3) simInput.unshift('b');
       simInput.unshift('inicio');
       simStack = [stackalphabet.find(el=>el.id == initialStack).title];
+      if(mode == 3) simInput.push('b');
       simInput.push('fin');
       simCurrent = [];
       simStep = 0;
+      simDirection = 1;
+      simNew = undefined;
+
       $('#simMessage').empty()
       renderInput();
       renderGraph();
-    })
+    }
     function selectInitialStack(id){
       initialStack = id;
       changeInitialStack();
@@ -438,8 +504,21 @@
       let n = pren.map(p=>p.title);
       let nid = pren.map(p=>p.id);
       stateFunctions.push({id:count, start:start, letter:letter, stack: stack, end:end, nextstack: nid});
-      $('#statefunctions').append(`<a class="ui label margined" onclick="removeFuncStack(${count})">𝛿(${s},${l},${t}) = {${e},${n.join('')}}</a>`);
+      $('#statefunctions').append(`<a class="ui label margined" onclick="removeFunc(${count})">𝛿(${s},${l},${t}) = {${e},${n.join('')}}</a>`);
       graph.push(`Nn${start}--${l}, ${t}-->Nn${end} %%${count};`);
+      renderGraph();
+      writeTuple();
+    }
+    function addFuncTuring(start,letter,end,newletter,direction){
+      count ++;
+      let s = states.find(el=>el.id == start).title;
+      let l = alphabet.find(el=>el.id == letter).title;
+      let e = states.find(el=>el.id == end).title;
+      let w = alphabet.find(el=>el.id == newletter).title;
+      let d = direction;
+      stateFunctions.push({id:count, start:start, letter:letter, end:end, newletter:newletter, direction:direction});
+      $('#statefunctions').append(`<a class="ui label margined" onclick="removeFunc(${count})">𝛿(${s},${l}) = {${e},${w},${d}}</a>`);
+      graph.push(`Nn${start}--${l}-->Nn${end} %%${count};`);
       renderGraph();
       writeTuple();
     }
@@ -452,12 +531,13 @@
       renderGraph();
       writeTuple();
     }
-    function removeFuncStack(id){
-      let ind = stateFunctions.findIndex(el=>el.id==id);
-      stateFunctions.splice(ind,1);
-      $('#statefunctions').children().eq(ind).remove();
-      let gind = graph.findIndex(el=>el.indexOf('%%'+id) !== -1);
-      graph.splice(gind,1);
+    function removeAllFunc(){
+      stateFunctions.forEach(f=>{
+        let gind = graph.findIndex(el=>el.indexOf('%%'+f.id) !== -1);
+        graph.splice(gind,1);
+      });
+      stateFunctions = [];
+      $('#statefunctions').empty();
       renderGraph();
       writeTuple();
     }
@@ -521,8 +601,9 @@
     function addLetter(name){
       count ++;
       alphabet.push({id:count, title:name});
-      $('#alphabet').append(`<a class="ui label margined" onclick="removeLetter(${count})">${name}</a>`);
-      $('#selectFuncLetter').append(`<option value="${count}">${name}</option>`);
+        $('#alphabet').append(`<a class="ui label margined" onclick="removeLetter(${count})">${name}</a>`);
+        $('#selectFuncLetter').append(`<option value="${count}">${name}</option>`);
+        $('#selectFuncNew').append(`<option value="${count}">${name}</option>`);
       renderGraph();
       writeTuple();
     }
@@ -545,6 +626,8 @@
       alphabet.splice(ind,1);
       $('#alphabet').children().eq(ind).remove();
       $('#selectFuncLetter').children().eq(ind).remove();
+      $('#selectFuncNew').children().eq(ind).remove();
+
 
       let removeIds = stateFunctions.filter(f=>f.letter == id).map(a=>a.id);
       stateFunctions = stateFunctions.filter(f=>f.letter !== id);
@@ -584,7 +667,7 @@
       $('#inputsymbols').empty();
       $('#stacksymbols').empty();
       simInput.forEach((s,i)=>{
-        let current = simStep == simInput.length-1 && simError==-1?'green':i==simError-1?'red':i==simStep?'blue':'';
+        let current = simStep == simInput.length-1 && simError==-1?'green':i==simError?'red':i==simStep?'blue':'';
         let sym = `<span id="simstart" class="mini ui button ui button ${current}" style="padding-left: 1px;padding-right: 1px">${s}</span>`;
         $('#inputsymbols').append(sym);
       });
@@ -659,6 +742,7 @@ var findOne = function (haystack, arr) {
         addLetter('0');
         addLetter('1');
         addStackLetter('S');
+        addStackLetter('T');
         selectFinalState(states[2].id);
         selectFinalState(states[0].id);
         addFunc(states[0].id,alphabet[0].id,states[1].id);
